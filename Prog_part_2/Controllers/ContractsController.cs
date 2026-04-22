@@ -216,7 +216,7 @@ namespace Prog_part_2.Controllers
 
             return RedirectToAction("Details", new { id = contractId });
         }
-        public IActionResult DownloadFile(int fileId)
+        public IActionResult DownloadFile(int fileId, bool download = false)
         {
             var file = _context.ContractFiles.FirstOrDefault(f => f.Id == fileId);
 
@@ -230,7 +230,8 @@ namespace Prog_part_2.Controllers
 
             byte[] bytes = System.IO.File.ReadAllBytes(path);
 
-            return File(bytes, "application/octet-stream", file.FileName);
+       
+            return File(bytes, "application/pdf");
         }
 
     }
