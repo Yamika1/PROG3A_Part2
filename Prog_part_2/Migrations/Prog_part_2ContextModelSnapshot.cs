@@ -179,15 +179,12 @@ namespace Prog_part_2.Migrations
                         .HasColumnType("date");
 
                     b.Property<string>("RequestDescription")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RequestTypes")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ServiceStatus")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");

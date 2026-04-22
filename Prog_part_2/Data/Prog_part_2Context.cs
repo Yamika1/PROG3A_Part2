@@ -18,6 +18,19 @@ namespace Prog_part_2.Data
         public DbSet<Prog_part_2.Models.Contracts> Contracts { get; set; } = default!;
         public DbSet<Prog_part_2.Models.Manager> Manager { get; set; } = default!;
         public DbSet<Prog_part_2.Models.ServiceRequests> ServiceRequests { get; set; } = default!;
-        public DbSet<ContractFile> ContractFiles { get; set; }
+        public DbSet<ContractFile> ContractFiles { get; set; } = default!;
+
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+
+            modelBuilder.Entity<ContractFile>()
+                .HasOne(f => f.Contracts)
+                .WithMany(c => c.Files)
+                .HasForeignKey(f => f.ContractId);
+        }
     }
 }
+   

@@ -82,7 +82,6 @@ namespace Prog_part_2.Controllers
 
             return View(contract);
         }
-
         // GET: Contracts/Create
         public IActionResult Create()
         {
@@ -189,30 +188,37 @@ namespace Prog_part_2.Controllers
             if (contract == null)
                 return NotFound();
 
-            string folder = Path.Combine(_environment.WebRootPath, "uploads");
-
-            if (!Directory.Exists(folder))
-                Directory.CreateDirectory(folder);
-
-            string uniqueName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
-            string fullPath = Path.Combine(folder, uniqueName);
-
-            using (var stream = new FileStream(fullPath, FileMode.Create))
+            try
             {
-                await file.CopyToAsync(stream);
+                string folder = Path.Combine(_environment.WebRootPath, "uploads");
+
+                if (!Directory.Exists(folder))
+                    Directory.CreateDirectory(folder);
+
+                string uniqueName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+                string fullPath = Path.Combine(folder, uniqueName);
+
+                using (var stream = new FileStream(fullPath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                var contractFile = new ContractFile
+                {
+                    FileName = file.FileName,
+                    FilePath = uniqueName,
+                    FileSize = file.Length,
+                    UploadedDate = DateTime.Now,
+                    ContractId = contractId
+                };
+
+                _context.ContractFiles.Add(contractFile);
+                await _context.SaveChangesAsync();
             }
-
-            var contractFile = new ContractFile
+            catch (Exception ex)
             {
-                FileName = file.FileName,
-                FilePath = uniqueName,
-                FileSize = file.Length,
-                UploadedDate = DateTime.Now,
-                ContractId = contractId
-            };
-
-            _context.ContractFiles.Add(contractFile);
-            await _context.SaveChangesAsync();
+                TempData["Error"] = "Upload failed: " + ex.Message;
+            }
 
             return RedirectToAction("Details", new { id = contractId });
         }
@@ -230,10 +236,12 @@ namespace Prog_part_2.Controllers
 
             byte[] bytes = System.IO.File.ReadAllBytes(path);
 
-       
+
+            if (download)
+                return File(bytes, "application/pdf", file.FileName);
+
             return File(bytes, "application/pdf");
         }
-
     }
 
 }

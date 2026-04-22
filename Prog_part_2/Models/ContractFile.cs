@@ -6,11 +6,10 @@
         public string FileName { get; set; }
         public string FilePath { get; set; }
         public long FileSize { get; set; }
-
         public DateTime UploadedDate { get; set; }
 
-        // foreign key
         public int ContractId { get; set; }
+        public Contracts Contracts { get; set; }
 
         public bool IsValid(string fileName, long fileSize)
         {

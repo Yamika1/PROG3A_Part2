@@ -101,7 +101,6 @@
                 </form>
    <hr />
 
-               
                 @if (Model.Files == null || Model.Files.Count == 0)
                 {
                     <p class="text-muted">No documents uploaded.</p>
@@ -123,12 +122,21 @@
                                 <div class="mt-2">
                                     <a asp-action="DownloadFile"
                                        asp-route-fileId="@doc.Id"
-                                      class="btn btn-sm btn-primary">
-                                        View PDF
+                                       target="_blank"
+                                       class="btn btn-sm btn-primary">
+                                        View
+                                    </a>
+
+
+                                    <a asp-action="DownloadFile"
+                                       asp-route-fileId="@doc.Id"
+                                       asp-route-download="true"
+                                       class="btn btn-sm btn-success">
+                                        Download
                                     </a>
                                 </div>
 
-                            
+
                             </div>
                         }
                     </div>
@@ -138,6 +146,7 @@
         </div>
     </div>
 </div>
+
 
 
 <div class="mt-3">
