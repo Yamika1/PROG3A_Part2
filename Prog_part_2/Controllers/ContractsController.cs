@@ -54,11 +54,18 @@ namespace Prog_part_2.Controllers
                 contracts = contracts.Where(c =>
                     c.ContractName.ToLower().Contains(searchstring) ||
                     c.StartDate.ToString().Contains(searchstring) ||
-                    c.EndDate.ToString().Contains(searchstring)
+                         c.EndDate.ToString().Contains(searchstring)
                 );
             }
 
-            return View(await contracts.ToListAsync());
+            var list = await contracts.ToListAsync();
+
+            foreach (var c in list)
+                c.ContractStatus = GetContractStatus(c);
+
+            await _context.SaveChangesAsync();
+
+            return View(list);
         }
 
         // GET: Contracts/Details/5

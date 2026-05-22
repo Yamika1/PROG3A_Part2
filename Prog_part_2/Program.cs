@@ -9,7 +9,8 @@ builder.Services.AddDbContext<Prog_part_2Context>(options =>
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient("CurrencyApi", client =>
 {
-    client.BaseAddress = new Uri("https://v6.exchangerate-api.com/v6/");
+    client.BaseAddress = new Uri("https://localhost:7197");
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 
 var app = builder.Build();
