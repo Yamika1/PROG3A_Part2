@@ -1,0 +1,6 @@
+services:
+  prog_part_2:
+    image: ${DOCKER_REGISTRY-}progpart2
+    build:
+      context: .
+      dockerfile: Prog_part_2/Dockerfile
