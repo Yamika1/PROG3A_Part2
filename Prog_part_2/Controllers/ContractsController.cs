@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Prog_part_2.Data;
 using Prog_part_2.Models;
+using System.Text;
+using System.Text.Json;
 
 namespace Prog_part_2.Controllers
 {
@@ -14,168 +11,186 @@ namespace Prog_part_2.Controllers
     {
         private readonly Prog_part_2Context _context;
         private readonly IWebHostEnvironment _environment;
+        private readonly IHttpClientFactory _httpClientFactory;
 
-        public ContractsController(Prog_part_2Context context, IWebHostEnvironment environment)
+        private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        public ContractsController(Prog_part_2Context context,
+            IWebHostEnvironment environment,
+            IHttpClientFactory httpClientFactory)
         {
             _context = context;
             _environment = environment;
+            _httpClientFactory = httpClientFactory;
         }
 
+        private HttpClient CreateClient() => _httpClientFactory.CreateClient("ContractsApi");
 
         private ContractStatus GetContractStatus(Contracts contract)
         {
             var today = DateTime.Today;
-
-            if (contract.StartDate > today)
-                return ContractStatus.Draft;
-
-            if (contract.StartDate <= today && contract.EndDate >= today)
-                return ContractStatus.Active;
-
-            if (contract.EndDate < today)
-                return ContractStatus.Expired;
-
+            if (contract.StartDate > today) return ContractStatus.Draft;
+            if (contract.StartDate <= today && contract.EndDate >= today) return ContractStatus.Active;
+            if (contract.EndDate < today) return ContractStatus.Expired;
             return ContractStatus.Draft;
         }
 
-        // GET: Contracts
         public async Task<IActionResult> Index(string searchstring)
         {
-            if (_context.Contracts == null)
-                return Problem("Entity set not found");
+            var httpClient = CreateClient();
+            var response = await httpClient.GetAsync("api/contracts");
 
-            var contracts = from c in _context.Contracts
-                            select c;
+            if (!response.IsSuccessStatusCode)
+                return Problem("Could not retrieve contracts from API");
+
+            var json = await response.Content.ReadAsStringAsync();
+            var contracts = JsonSerializer.Deserialize<List<Contracts>>(json, _jsonOptions) ?? new();
 
             if (!string.IsNullOrEmpty(searchstring))
             {
                 searchstring = searchstring.ToLower();
-
                 contracts = contracts.Where(c =>
                     c.ContractName.ToLower().Contains(searchstring) ||
                     c.StartDate.ToString().Contains(searchstring) ||
-                         c.EndDate.ToString().Contains(searchstring)
-                );
+                    c.EndDate.ToString().Contains(searchstring)
+                ).ToList();
             }
 
-            var list = await contracts.ToListAsync();
-
-            foreach (var c in list)
+            foreach (var c in contracts)
                 c.ContractStatus = GetContractStatus(c);
 
-            await _context.SaveChangesAsync();
-
-            return View(list);
+            return View(contracts);
         }
 
-        // GET: Contracts/Details/5
         public async Task<IActionResult> Details(int? id)
         {
-            if (id == null)
-                return NotFound();
+            if (id == null) return NotFound();
 
-            var contract = await _context.Contracts
-       .Include(c => c.Files)
-       .FirstOrDefaultAsync(c => c.Id == id);
+            var httpClient = CreateClient();
+            var response = await httpClient.GetAsync($"api/contracts/{id}");
 
-            if (contract == null)
-                return NotFound();
+            if (!response.IsSuccessStatusCode) return NotFound();
 
+            var json = await response.Content.ReadAsStringAsync();
+            var contract = JsonSerializer.Deserialize<Contracts>(json, _jsonOptions);
+
+            if (contract == null) return NotFound();
 
             contract.ContractStatus = GetContractStatus(contract);
-            await _context.SaveChangesAsync();
-
             ViewBag.Status = contract.ContractStatus;
+
+            contract.Files = await _context.ContractFiles
+                .Where(f => f.ContractId == id)
+                .ToListAsync();
 
             return View(contract);
         }
-        // GET: Contracts/Create
-        public IActionResult Create()
-        {
-            return View();
-        }
 
+        public IActionResult Create() => View();
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("ContractId,ContractName,ContractDescription,ContractType,StartDate,EndDate")] Contracts contract)
+        public async Task<IActionResult> Create(
+            [Bind("ContractName,ContractDescription,ContractType,StartDate,EndDate")] Contracts contract)
         {
-            if (!ModelState.IsValid)
+            if (!ModelState.IsValid) return View(contract);
+
+            var httpClient = CreateClient();
+
+            var addContractDto = new
             {
-                _context.Add(contract);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Details), new { id = contract.Id });
+                contract.ContractName,
+                contract.ContractType,
+                contract.ContractDescription,
+                contract.StartDate,
+                contract.EndDate
+            };
+
+            var json = JsonSerializer.Serialize(addContractDto);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PostAsync("api/contracts", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                ModelState.AddModelError("", "Failed to create contract.");
+                return View(contract);
             }
-            return View(contract);
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var created = JsonSerializer.Deserialize<Contracts>(responseJson, _jsonOptions);
+
+            return RedirectToAction(nameof(Details), new { id = created?.Id });
         }
 
-        // GET: Contracts/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null) return NotFound();
 
-            var contract = await _context.Contracts.FindAsync(id);
-            if (contract == null) return NotFound();
+            var httpClient = CreateClient();
+            var response = await httpClient.GetAsync($"api/contracts/{id}");
+
+            if (!response.IsSuccessStatusCode) return NotFound();
+
+            var json = await response.Content.ReadAsStringAsync();
+            var contract = JsonSerializer.Deserialize<Contracts>(json, _jsonOptions);
 
             return View(contract);
         }
 
-        // POST: Contracts/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, Contracts contract)
         {
             if (id != contract.Id) return NotFound();
+            if (!ModelState.IsValid) return View(contract);
 
-            if (ModelState.IsValid)
+            var httpClient = CreateClient();
+            var json = JsonSerializer.Serialize(contract);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PutAsync($"api/contracts/{id}", content);
+
+            if (!response.IsSuccessStatusCode)
             {
-                try
-                {
-                    _context.Update(contract);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!_context.Contracts.Any(e => e.Id == contract.Id))
-                        return NotFound();
-                    else
-                        throw;
-                }
-
-                return RedirectToAction(nameof(Index));
+                ModelState.AddModelError("", "Failed to update contract.");
+                return View(contract);
             }
 
-            return View(contract);
+            return RedirectToAction(nameof(Index));
         }
 
-        // GET: Contracts/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
-            if (id == null)
-                return NotFound();
+            if (id == null) return NotFound();
 
-            var contract = await _context.Contracts
-                .FirstOrDefaultAsync(m => m.Id == id);
+            var httpClient = CreateClient();
+            var response = await httpClient.GetAsync($"api/contracts/{id}");
 
-            if (contract == null)
-                return NotFound();
+            if (!response.IsSuccessStatusCode) return NotFound();
+
+            var json = await response.Content.ReadAsStringAsync();
+            var contract = JsonSerializer.Deserialize<Contracts>(json, _jsonOptions);
 
             return View(contract);
         }
 
-        // POST: Contracts/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var contract = await _context.Contracts.FindAsync(id);
+            var httpClient = CreateClient();
+            var response = await httpClient.DeleteAsync($"api/contracts/{id}");
 
-            if (contract != null)
-                _context.Contracts.Remove(contract);
+            if (!response.IsSuccessStatusCode)
+                return Problem("Failed to delete contract.");
 
-            await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
+
         [HttpPost]
         public async Task<IActionResult> Upload(int contractId, IFormFile file)
         {
