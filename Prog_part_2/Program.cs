@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Prog_part_2.Data;
 var builder = WebApplication.CreateBuilder(args);
@@ -12,7 +12,12 @@ builder.Services.AddHttpClient("ClientsApi", client =>
     client.BaseAddress = new Uri("http://localhost:5084/");
 });
 
+builder.Services.AddHttpClient("ContractsApi", client =>
+{
+    client.BaseAddress = new Uri("http://localhost:5084/");
+});
 var app = builder.Build();
+
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -37,4 +42,3 @@ app.MapControllerRoute(
 app.Run();
 
 
-app.Run();
