@@ -7,10 +7,9 @@ builder.Services.AddDbContext<Prog_part_2Context>(options =>
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddHttpClient("CurrencyApi", client =>
+builder.Services.AddHttpClient("ClientsApi", client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7197");
-    client.Timeout = TimeSpan.FromSeconds(30);
+    client.BaseAddress = new Uri("http://localhost:5084/");
 });
 
 var app = builder.Build();

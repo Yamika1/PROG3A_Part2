@@ -1,174 +1,151 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using Prog_part_2.Data;
+﻿using Microsoft.AspNetCore.Mvc;
 using Prog_part_2.Models;
+using System.Text;
+using System.Text.Json;
 
 namespace Prog_part_2.Controllers
 {
     public class ClientsController : Controller
     {
-        private readonly Prog_part_2Context _context;
-
-        public ClientsController(Prog_part_2Context context)
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
         {
-            _context = context;
+            PropertyNameCaseInsensitive = true
+        };
+
+        public ClientsController(IHttpClientFactory httpClientFactory)
+        {
+            _httpClientFactory = httpClientFactory;
         }
 
-        // GET: Clients
+        private HttpClient CreateClient() => _httpClientFactory.CreateClient("ClientsApi");
+
         public async Task<IActionResult> Index(string searchstring)
         {
-            if (_context.Client == null)
-                return Problem("Entity set not found");
+            var httpClient = CreateClient();
+            var response = await httpClient.GetAsync("api/clients");
 
-            var clients = from c in _context.Client
-                            select c;
+            if (!response.IsSuccessStatusCode)
+                return Problem("Could not retrieve clients from API");
+
+            var json = await response.Content.ReadAsStringAsync();
+            var clients = JsonSerializer.Deserialize<List<Client>>(json, _jsonOptions) ?? new();
 
             if (!string.IsNullOrEmpty(searchstring))
             {
                 searchstring = searchstring.ToLower();
-
                 clients = clients.Where(c =>
                     c.ClientFirstName.ToLower().Contains(searchstring) ||
-                    c.ClientLastName.ToString().Contains(searchstring) 
-                   
-                );
+                    c.ClientLastName.ToLower().Contains(searchstring)
+                ).ToList();
             }
 
-            return View(await clients.ToListAsync());
+            return View(clients);
         }
 
-        // GET: Clients/Details/5
         public async Task<IActionResult> Details(int? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
-            var client = await _context.Client
-                .FirstOrDefaultAsync(m => m.ClientId == id);
-            if (client == null)
-            {
-                return NotFound();
-            }
+            var httpClient = CreateClient();
+            var response = await httpClient.GetAsync($"api/clients/{id}");
 
-            return View(client);
+            if (!response.IsSuccessStatusCode) return NotFound();
+
+            var json = await response.Content.ReadAsStringAsync();
+            var clientModel = JsonSerializer.Deserialize<Client>(json, _jsonOptions);
+
+            return View(clientModel);
         }
 
-        // GET: Clients/Create
-        public IActionResult Create()
-        {
-            return View();
-        }
+        public IActionResult Create() => View();
 
-        // POST: Clients/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("ClientId,ClientFirstName,ClientLastName,Region,ContactNumber,EmailAddress")] Client client)
+        public async Task<IActionResult> Create(
+            [Bind("ClientFirstName,ClientLastName,Region,ContactNumber,EmailAddress")] Client clientModel)
         {
-            if (ModelState.IsValid)
+            if (!ModelState.IsValid) return View(clientModel);
+
+            var httpClient = CreateClient();
+            var json = JsonSerializer.Serialize(clientModel);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PostAsync("api/clients", content);
+
+            if (!response.IsSuccessStatusCode)
             {
-                _context.Add(client);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
+                ModelState.AddModelError("", "Failed to create client.");
+                return View(clientModel);
             }
-            return View(client);
+
+            return RedirectToAction(nameof(Index));
         }
 
-        // GET: Clients/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
-            var client = await _context.Client.FindAsync(id);
-            if (client == null)
-            {
-                return NotFound();
-            }
-            return View(client);
+            var httpClient = CreateClient();
+            var response = await httpClient.GetAsync($"api/clients/{id}");
+
+            if (!response.IsSuccessStatusCode) return NotFound();
+
+            var json = await response.Content.ReadAsStringAsync();
+            var clientModel = JsonSerializer.Deserialize<Client>(json, _jsonOptions);
+
+            return View(clientModel);
         }
 
-        // POST: Clients/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("ClientId,ClientFirstName,ClientLastName,Region,ContactNumber,EmailAddress")] Client client)
+        public async Task<IActionResult> Edit(int id,
+            [Bind("ClientId,ClientFirstName,ClientLastName,Region,ContactNumber,EmailAddress")] Client clientModel)
         {
-            if (id != client.ClientId)
+            if (id != clientModel.ClientId) return NotFound(); 
+            if (!ModelState.IsValid) return View(clientModel);
+
+            var httpClient = CreateClient();
+            var json = JsonSerializer.Serialize(clientModel);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PutAsync($"api/clients/{id}", content);
+
+            if (!response.IsSuccessStatusCode)
             {
-                return NotFound();
+                ModelState.AddModelError("", "Failed to update client.");
+                return View(clientModel);
             }
 
-            if (ModelState.IsValid)
-            {
-                try
-                {
-                    _context.Update(client);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!ClientExists(client.ClientId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                return RedirectToAction(nameof(Index));
-            }
-            return View(client);
+            return RedirectToAction(nameof(Index));
         }
 
-        // GET: Clients/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
-            var client = await _context.Client
-                .FirstOrDefaultAsync(m => m.ClientId == id);
-            if (client == null)
-            {
-                return NotFound();
-            }
+            var httpClient = CreateClient();
+            var response = await httpClient.GetAsync($"api/clients/{id}");
 
-            return View(client);
+            if (!response.IsSuccessStatusCode) return NotFound();
+
+            var json = await response.Content.ReadAsStringAsync();
+            var clientModel = JsonSerializer.Deserialize<Client>(json, _jsonOptions);
+
+            return View(clientModel);
         }
 
-        // POST: Clients/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var client = await _context.Client.FindAsync(id);
-            if (client != null)
-            {
-                _context.Client.Remove(client);
-            }
+            var httpClient = CreateClient();
+            var response = await httpClient.DeleteAsync($"api/clients/{id}");
 
-            await _context.SaveChangesAsync();
+            if (!response.IsSuccessStatusCode)
+                return Problem("Failed to delete client.");
+
             return RedirectToAction(nameof(Index));
-        }
-
-        private bool ClientExists(int id)
-        {
-            return _context.Client.Any(e => e.ClientId == id);
         }
     }
 }
