@@ -82,9 +82,16 @@ namespace Prog_part_2.Controllers
             contract.ContractStatus = GetContractStatus(contract);
             ViewBag.Status = contract.ContractStatus;
 
-            contract.Files = await _context.ContractFiles
-                .Where(f => f.ContractId == id)
-                .ToListAsync();
+            try
+            {
+                contract.Files = await _context.ContractFiles
+                    .Where(f => f.ContractId == id)
+                    .ToListAsync();
+            }
+            catch
+            {
+                contract.Files = new List<ContractFile>();
+            }
 
             return View(contract);
         }
@@ -94,8 +101,12 @@ namespace Prog_part_2.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(
-            [Bind("ContractName,ContractDescription,ContractType,StartDate,EndDate")] Contracts contract)
+    [Bind("ContractName,ContractDescription,ContractType,StartDate,EndDate")] Contracts contract)
         {
+            ModelState.Remove("clients");
+            ModelState.Remove("Files");
+            ModelState.Remove("ContractStatus");
+
             if (!ModelState.IsValid) return View(contract);
 
             var httpClient = CreateClient();

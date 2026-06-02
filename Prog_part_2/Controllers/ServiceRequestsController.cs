@@ -230,7 +230,7 @@ namespace Prog_part_2.Controllers
                     data.base_code = fromUpper;
                     data.conversion_result = amount * data.conversion_rate;
 
-            
+
                     ViewBag.Result = data;
                 }
                 else
@@ -243,10 +243,11 @@ namespace Prog_part_2.Controllers
                 ViewBag.Error = $"Conversion failed: {ex.Message}";
             }
 
-          
+
             var serviceRequests = await _context.ServiceRequests.ToListAsync();
 
             return View("Index", serviceRequests);
         }
     }
 }
+
