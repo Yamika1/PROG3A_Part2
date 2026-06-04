@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="../WebApi_.Net8/WebApi_.Net8.csproj" Id="b2822639-3034-4316-9556-869cb505feeb" />
+  <Project Path="../../../source/repos/WebApi_.Net8/WebApi_.Net8.csproj" />
   <Project Path="docker-compose.dcproj">
     <Build />
   </Project>

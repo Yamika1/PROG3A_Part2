@@ -1,6 +1,54 @@
 services:
-  prog_part_2:
-    image: ${DOCKER_REGISTRY-}progpart2
+
+  sql-server-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sql-server-db
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Pregasen@146#
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqldata:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Pregasen@146#' -Q 'SELECT 1' -No -C || exit 1"]
+      interval: 10s
+      retries: 10
+      start_period: 30s
+      timeout: 5s
+
+  glms-backend-api:
+    build:
+      context: .
+      dockerfile: WebApi_.Net8/Dockerfile
+    container_name: glms-backend-api
+    depends_on:
+      sql-server-db:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__DefaultConnection=Server=sql-server-db;Database=WebApiProg3ADb;User Id=sa;Password=Pregasen@146#;TrustServerCertificate=True;MultipleActiveResultSets=true;
+    ports:
+      - "5084:8080"
+    restart: on-failure
+
+  glms-frontend-web:
     build:
       context: .
       dockerfile: Prog_part_2/Dockerfile
+    container_name: glms-frontend-web
+    depends_on:
+      glms-backend-api:
+        condition: service_started
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__Prog_part_2Context=Server=sql-server-db;Database=WebApiProg3ADb;User Id=sa;Password=Pregasen@146#;TrustServerCertificate=True;MultipleActiveResultSets=true;
+    ports:
+      - "8082:8080"
+    restart: on-failure
+
+volumes:
+  sqldata:
